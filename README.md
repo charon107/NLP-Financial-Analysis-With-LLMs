@@ -1,6 +1,4 @@
 # FYP
-Analysing financial documents containing text, graphs and charts for downstream applications such as stock market prediction, investment etc. is a fast growing area because it reduces manual labour to study and analysing huge documents.
-
 Statement of Ethical Compliance
 My project falls under the A0 category. This indicates that there is no use of data derived from humans or animals, as all data utilized for this project is based on company financial reports. Furthermore, there is no involvement of human participants in any stage or activity throughout the project.
 I hereby confirm that I will adhere to the ethical guidance provided and will ensure that all data used in this project is handled with utmost responsibility and integrity. Any changes to the project that might raise ethical concerns will be promptly communicated and approval will be sought before proceeding.
