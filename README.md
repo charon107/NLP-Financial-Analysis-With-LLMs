@@ -2,4 +2,4 @@ Analysing financial documents containing text, graphs and charts for downstream 
 
 In this project, we aim to utilise LLMs to analyse financial reports and documents containing text and images for various downstream applications such as classification or generation serving different goals.
 
-[GitHub](http://github.com)
+[Project Proposal](Project Proposal.pdf)
