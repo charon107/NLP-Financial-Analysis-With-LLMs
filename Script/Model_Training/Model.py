@@ -7,8 +7,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.cuda.amp import GradScaler, autocast
 from tqdm.auto import tqdm
 
-# 禁用 transformers 库的并行 tokenization 警告
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 # 检测是否有 CUDA 设备可用，并据此设置设备
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
