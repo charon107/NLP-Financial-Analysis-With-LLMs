@@ -6,36 +6,61 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.cuda.amp import GradScaler, autocast
 from tqdm.auto import tqdm
+from torch.nn.utils import clip_grad_norm_
 
 
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# 检测是否有 CUDA 设备可用，并据此设置设备
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 指定预训练模型名称
+
+
 model_name = 'google/long-t5-local-base'
-# 加载分词器
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-# 加载预训练模型，并将模型移动到指定的设备上
+
 model = LongT5ForConditionalGeneration.from_pretrained(model_name).to(device)
 
-# 定义一个 Dataset 类，用于处理文本数据
+
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, data_dir, labels_dir, max_length=8192):
+    def __init__(self, tokenizer, data_dir, labels_dir, max_length=2048, split_text=True, num_splits=8, limit=None):
         self.tokenizer = tokenizer
         self.data_dir = data_dir
         self.labels_dir = labels_dir
         self.max_length = max_length
         self.inputs = []
         self.targets = []
+        self.split_text = split_text
+        self.num_splits = num_splits
+        
+        filenames = os.listdir(data_dir)
+        if limit:
+            filenames = filenames[:limit]
 
-        for filename in os.listdir(data_dir):
+        for filename in filenames:
             if filename.endswith('.txt'):
                 file_path = os.path.join(data_dir, filename)
                 labels_path = os.path.join(labels_dir, filename.replace('.txt', '_converted.txt'))
-                with open(file_path, 'r', encoding='utf-8') as f, open(labels_path, 'r', encoding='utf-8') as f2:
-                    self.inputs.append(f.read().strip())
-                    self.targets.append(f2.read().strip())
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    text = f.read().strip()
+                with open(labels_path, 'r', encoding='utf-8') as f:
+                    label = f.read().strip()
+
+                if self.split_text:
+                    split_length = len(text) // self.num_splits
+                    for i in range(self.num_splits):
+                        start_idx = i * split_length
+                        if i == self.num_splits - 1:  # Last split takes the remaining part of the text
+                            end_idx = len(text)
+                        else:
+                            end_idx = (i + 1) * split_length
+                        split_text = text[start_idx:end_idx]
+                        self.inputs.append(split_text)
+                        self.targets.append(label)
+                else:
+                    self.inputs.append(text)
+                    self.targets.append(label)
 
     def __len__(self):
         return len(self.inputs)
@@ -47,56 +72,74 @@ class TextDataset(Dataset):
         target_ids = self.tokenizer(target_text, return_tensors="pt", max_length=self.max_length, padding='max_length', truncation=True).input_ids.squeeze()
         return {"input_ids": input_ids, "labels": target_ids}
 
-# 定义训练集和测试集的文件路径
+
+
 train_data_dir = "/users/sgzli54/FYP/Dataset/Train_txt/"
 train_labels_dir = "/users/sgzli54/FYP/Dataset/Train_csv_txt/"
 test_data_dir = "/users/sgzli54/FYP/Dataset/Val_txt/" 
 test_labels_dir = "/users/sgzli54/FYP/Dataset/Val_csv_txt/"  
 
-# 创建训练集和测试集的 Dataset 实例
-train_dataset = TextDataset(tokenizer, train_data_dir, train_labels_dir, max_length=8192)
-test_dataset = TextDataset(tokenizer, test_data_dir, test_labels_dir, max_length=8192)  
 
-# 使用 DataLoader 加载数据集
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=1)  
+train_dataset = TextDataset(tokenizer, train_data_dir, train_labels_dir, max_length=2048,limit=50)
 
-# 定义优化器和学习率调度器
-optimizer = AdamW(model.parameters(), lr=5e-5)
+test_dataset = TextDataset(tokenizer, test_data_dir, test_labels_dir, max_length=2048)  
+
+
+train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=2)  
+
+
+#first_batch = next(iter(train_loader))
+#
+#inputs, labels = first_batch['input_ids'], first_batch['labels']
+#
+#print(inputs)
+#print(labels)
+
+
+optimizer = AdamW(model.parameters(), lr=5e-6)
 scheduler = ReduceLROnPlateau(optimizer, 'min', patience=1, factor=0.5)
 
-# 如果有 CUDA 设备可用，则启用梯度缩放以支持混合精度训练
+
 scaler = GradScaler() if torch.cuda.is_available() else None
 best_val_loss = float('inf')
 
-# 开始训练循环
+max_norm = 1.0
+
 for epoch in range(10):
-    model.train()
-    train_loss = 0
-    for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}', leave=True):
-        optimizer.zero_grad()
-        inputs, labels = batch['input_ids'].to(device), batch['labels'].to(device)
-        with autocast(enabled=scaler is not None):
-            outputs = model(input_ids=inputs, labels=labels)
-            loss = outputs.loss
-        if scaler:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
-        train_loss += loss.item()
-    model.eval()
-    test_loss = 0
-    with torch.no_grad():
-        for batch in test_loader:  
-            inputs, labels = batch['input_ids'].to(device), batch['labels'].to(device)
-            with autocast(enabled=scaler is not None):
-                outputs = model(input_ids=inputs, labels=labels)
-                test_loss += outputs.loss.item()
-    test_loss /= len(test_loader)  
-    if test_loss < best_val_loss:  
-        best_val_loss = test_loss  
-        torch.save(model.state_dict(), f'/users/sgzli54/FYP/Model/model_epoch_{epoch+1}.pth')
-    print(f'Epoch {epoch+1}, Train Loss: {train_loss / len(train_loader)}, Test Loss: {test_loss}') 
+     model.train()
+     train_loss = 0
+     for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}', leave=True):
+         optimizer.zero_grad()
+         inputs, labels = batch['input_ids'].to(device), batch['labels'].to(device)
+         with autocast(enabled=scaler is not None):
+             outputs = model(input_ids=inputs, labels=labels)
+             loss = outputs.loss
+         if scaler:
+             scaler.scale(loss).backward()
+         
+             if max_norm > 0:
+                 scaler.unscale_(optimizer) 
+                 clip_grad_norm_(model.parameters(), max_norm)
+             scaler.step(optimizer)
+             scaler.update()
+         else:
+             loss.backward()
+   
+             if max_norm > 0:
+                 clip_grad_norm_(model.parameters(), max_norm)
+             optimizer.step()
+         train_loss += loss.item()
+     model.eval()
+     test_loss = 0
+     with torch.no_grad():
+         for batch in test_loader:
+             inputs, labels = batch['input_ids'].to(device), batch['labels'].to(device)
+             with autocast(enabled=scaler is not None):
+                 outputs = model(input_ids=inputs, labels=labels)
+                 test_loss += outputs.loss.item()
+     test_loss /= len(test_loader)
+     if test_loss < best_val_loss:
+         best_val_loss = test_loss
+         torch.save(model.state_dict(), f'/users/sgzli54/FYP/Model/model_epoch_{epoch+1}.pth')
+     print(f'Epoch {epoch+1}, Train Loss: {train_loss / len(train_loader)}, Test Loss: {test_loss}')
