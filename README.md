@@ -10,18 +10,6 @@ In this project, we aim to utilize Large Language Models (LLMs) to analyze finan
 - **Image and Chart Understanding**: Interpret the charts and graphs in the documents through advanced image recognition technologies.
 - **Downstream Applications**: Apply the analysis results to fields such as stock market prediction and investment decisions.
 
-## Getting Started
-
-Please refer to our [Project Proposal](./Project%20Proposal.pdf) document for more details and planning of the project.
-
-## Contribution Guide
-
-We welcome any form of contribution, whether it's feature enhancements, documentation improvements, or issue reporting. Please see `CONTRIBUTING.md` for how to get started.
-
-## License
-
-This project is licensed under the MIT License. For details, please see the [LICENSE](./LICENSE) file.
-
 ## Contact Us
 
-If you have any questions or suggestions, please contact us through Issues.
+If you have any questions or suggestions, please contact us through sgzli54charon107@gmail.com
