@@ -10,6 +10,10 @@ In this project, we aim to utilize Large Language Models (LLMs) to analyze finan
 - **Image and Chart Understanding**: Interpret the charts and graphs in the documents through advanced image recognition technologies.
 - **Downstream Applications**: Apply the analysis results to fields such as stock market prediction and investment decisions.
 
+## Dataset
+ [Financial_Parameter_From_Moneycontrol](https://huggingface.co/datasets/Charon107/Financial_Parameter_From_Moneycontrol)
+
+
 ## Contact Us
 
 If you have any questions or suggestions, please contact us through sgzli54charon107@gmail.com
