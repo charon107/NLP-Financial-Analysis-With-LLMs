@@ -16,4 +16,4 @@ In this project, we aim to utilize Large Language Models (LLMs) to analyze finan
 
 ## Contact Us
 
-If you have any questions or suggestions, please contact us through sgzli54charon107@gmail.com
+If you have any questions or suggestions, please contact us through charon107@163.com
